@@ -2390,14 +2390,14 @@ void USpatialReceiver::ResolveIncomingOperations(UObject* Object, const FUnrealO
 			continue;
 		}
 
-		RepNotifyCalls.Push({ DependentChannel, ChannelObjectIter->Value });
+		ObjectsToInspect.Push({ DependentChannel, ChannelObjectIter->Value });
 	}
 
-	for (const auto& RepNotifyCall : RepNotifyCalls)
+	for (const auto& ChannelObjectPair : ObjectsToInspect)
 	{
-		USpatialActorChannel* DependentChannel = RepNotifyCall.Channel;
-		UObject* ReplicatingObject = RepNotifyCall.Object.Get();
-		FSpatialObjectRepState* RepState = DependentChannel->ObjectReferenceMap.Find(RepNotifyCall.Object);
+		USpatialActorChannel* DependentChannel = ChannelObjectPair.Channel;
+		UObject* ReplicatingObject = ChannelObjectPair.Object.Get();
+		FSpatialObjectRepState* RepState = DependentChannel->ObjectReferenceMap.Find(ChannelObjectPair.Object);
 		if (!RepState || !RepState->UnresolvedRefs.Contains(ObjectRef))
 		{
 			continue;
@@ -2411,7 +2411,7 @@ void USpatialReceiver::ResolveIncomingOperations(UObject* Object, const FUnrealO
 				UE_LOG(LogSpatialActorChannel, Log,
 					   TEXT("Actor to be resolved was torn off, so ignoring incoming operations. Object ref: %s, resolved object: %s"),
 					   *ObjectRef.ToString(), *Object->GetName());
-				DependentChannel->ObjectReferenceMap.Remove(RepNotifyCall.Object);
+				DependentChannel->ObjectReferenceMap.Remove(ChannelObjectPair.Object);
 				continue;
 			}
 		}
@@ -2423,7 +2423,7 @@ void USpatialReceiver::ResolveIncomingOperations(UObject* Object, const FUnrealO
 					   TEXT("Owning Actor of the object to be resolved was torn off, so ignoring incoming operations. Object ref: %s, "
 							"resolved object: %s"),
 					   *ObjectRef.ToString(), *Object->GetName());
-				DependentChannel->ObjectReferenceMap.Remove(RepNotifyCall.Object);
+				DependentChannel->ObjectReferenceMap.Remove(ChannelObjectPair.Object);
 				continue;
 			}
 		}
