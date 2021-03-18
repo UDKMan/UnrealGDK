@@ -6,7 +6,6 @@
 #include "EngineClasses/SpatialVirtualWorkerTranslator.h"
 #include "Interop/SpatialStaticComponentView.h"
 #include "Schema/AuthorityIntent.h"
-#include "Tests/TestingSchemaHelpers.h"
 
 #include "CoreMinimal.h"
 
@@ -46,12 +45,13 @@ TUniquePtr<SpatialVirtualWorkerTranslator> CreateVirtualWorkerTranslator()
 	TUniquePtr<SpatialVirtualWorkerTranslator> VirtualWorkerTranslator =
 		MakeUnique<SpatialVirtualWorkerTranslator>(nullptr, nullptr, ThisWorker);
 
-	Schema_Object* DataObject = TestingSchemaHelpers::CreateTranslationComponentDataFields();
+	const SpatialGDK::VirtualWorkerInfo VirtualWorkerOne = SpatialGDK::VirtualWorkerInfo{ThisVirtualWorker, ThisWorker, SpatialConstants::INVALID_ENTITY_ID, ThisWorkerId, SpatialConstants::INVALID_ENTITY_ID};
+	const SpatialGDK::VirtualWorkerInfo VirtualWorkerTwo = SpatialGDK::VirtualWorkerInfo{OtherVirtualWorker, OtherWorker, SpatialConstants::INVALID_ENTITY_ID, OtherWorkerId, SpatialConstants::INVALID_ENTITY_ID};
 
-	TestingSchemaHelpers::AddTranslationComponentDataMapping(DataObject, ThisVirtualWorker, ThisWorker, ThisWorkerId);
-	TestingSchemaHelpers::AddTranslationComponentDataMapping(DataObject, OtherVirtualWorker, OtherWorker, OtherWorkerId);
+	const TArray<SpatialGDK::VirtualWorkerInfo> VirtualWorkerList{VirtualWorkerOne, VirtualWorkerTwo};
+	const SpatialGDK::VirtualWorkerTranslation TranslationData = SpatialGDK::VirtualWorkerTranslation(VirtualWorkerList);
 
-	VirtualWorkerTranslator->ApplyVirtualWorkerManagerData(DataObject);
+	VirtualWorkerTranslator->ApplyVirtualWorkerManagerData(TranslationData);
 
 	return VirtualWorkerTranslator;
 }
