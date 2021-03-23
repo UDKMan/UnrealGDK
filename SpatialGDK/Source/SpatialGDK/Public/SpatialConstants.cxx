@@ -249,11 +249,22 @@ const TMap<Worker_ComponentId, FString> RoutingWorkerComponents = {
 
 const TArray<FString> RoutingWorkerSchemaImports = { "unreal/gdk/rpc_components.schema", "unreal/generated/rpc_endpoints.schema" };
 
-const TArray<Worker_ComponentId> KnownEntityAuthorityComponents = { POSITION_COMPONENT_ID,		 METADATA_COMPONENT_ID,
-                                                                    INTEREST_COMPONENT_ID,		 PLAYER_SPAWNER_COMPONENT_ID,
+const TArray<Worker_ComponentId> KnownEntityAuthorityComponents = { /*POSITION_COMPONENT_ID,		 METADATA_COMPONENT_ID,
+                                                                    INTEREST_COMPONENT_ID,		 */PLAYER_SPAWNER_COMPONENT_ID,
                                                                     DEPLOYMENT_MAP_COMPONENT_ID, STARTUP_ACTOR_MANAGER_COMPONENT_ID,
                                                                     GSM_SHUTDOWN_COMPONENT_ID,	 VIRTUAL_WORKER_TRANSLATION_COMPONENT_ID,
                                                                     SERVER_WORKER_COMPONENT_ID };
+
+const TMap<Worker_ComponentId, FString> WorkerEntityAuthorityComponents = {
+    { POSITION_COMPONENT_ID, "improbable.Position" },
+    { INTEREST_COMPONENT_ID, "improbable.Interest" },
+    { SERVER_WORKER_COMPONENT_ID, "unreal.ServerWorker"},
+    { AUTHORITY_DELEGATION_COMPONENT_ID, "improbable.AuthorityDelegation" },
+    { CROSSSERVER_SENDER_ENDPOINT_COMPONENT_ID, "unreal.generated.UnrealCrossServerSenderRPCs" },
+    { CROSSSERVER_RECEIVER_ACK_ENDPOINT_COMPONENT_ID, "unreal.generated.UnrealCrossServerReceiverACKRPCs" },
+};
+
+const TArray<FString> WorkerEntitySchemaImports = { "unreal/gdk/rpc_components.schema", "unreal/generated/rpc_endpoints.schema" };
 
 }
 

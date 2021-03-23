@@ -39,7 +39,7 @@ class SPATIALGDK_API CrossServerRPCService
 {
 public:
 	CrossServerRPCService(const ActorCanExtractRPCDelegate InCanExtractRPCDelegate, const ExtractRPCDelegate InExtractRPCCallback,
-						  const FSubView& InSubView, FRPCStore& InRPCStore);
+						  const FSubView& InSubView, const FSubView& InWorkerEntitySubView, FRPCStore& InRPCStore);
 
 	void AdvanceView();
 	void ProcessChanges();
@@ -51,6 +51,9 @@ public:
 	void FlushPendingClearedFields(TPair<EntityComponentId, PendingUpdate>& UpdateToSend);
 
 private:
+	void AdvanceViewForEntityDelta(const EntityDelta& Delta);
+	void ProcessChangesForEntityDelta(const EntityDelta& Delta);
+
 	// Process relevant view delta changes.
 	void EntityAdded(const Worker_EntityId EntityId);
 	void ComponentUpdate(const Worker_EntityId EntityId, const Worker_ComponentId ComponentId, Schema_ComponentUpdate* Update);
@@ -76,6 +79,7 @@ private:
 	ActorCanExtractRPCDelegate CanExtractRPCDelegate;
 	ExtractRPCDelegate ExtractRPCCallback;
 	const FSubView* SubView;
+	const FSubView* WorkerEntitySubView;
 
 	FRPCStore* RPCStore;
 

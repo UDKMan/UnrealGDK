@@ -310,7 +310,8 @@ void USpatialWorkerConnection::ExtractStartupOps(SpatialGDK::OpList& OpList, Spa
 			}
 			break;
 		case WORKER_OP_TYPE_COMPONENT_SET_AUTHORITY_CHANGE:
-			if (Op.op.component_set_authority_change.component_set_id == SpatialConstants::GDK_KNOWN_ENTITY_AUTH_COMPONENT_SET_ID)
+			if (Op.op.component_set_authority_change.component_set_id == SpatialConstants::SPATIALOS_WELLKNOWN_COMPONENTSET_ID
+				|| Op.op.component_set_authority_change.component_set_id == SpatialConstants::GDK_KNOWN_ENTITY_AUTH_COMPONENT_SET_ID)
 			{
 				ExtractedOpList.AddOp(Op);
 			}

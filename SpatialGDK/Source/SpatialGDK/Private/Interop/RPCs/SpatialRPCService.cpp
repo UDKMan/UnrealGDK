@@ -21,8 +21,8 @@ DECLARE_CYCLE_STAT(TEXT("SpatialRPCService SendRPC"), STAT_SpatialRPCServiceSend
 namespace SpatialGDK
 {
 SpatialRPCService::SpatialRPCService(const FSubView& InActorAuthSubView, const FSubView& InActorNonAuthSubView,
-									 USpatialLatencyTracer* InSpatialLatencyTracer, SpatialEventTracer* InEventTracer,
-									 USpatialNetDriver* InNetDriver)
+									 const FSubView& InWorkerEntitySubView, USpatialLatencyTracer* InSpatialLatencyTracer,
+									 SpatialEventTracer* InEventTracer, USpatialNetDriver* InNetDriver)
 	: NetDriver(InNetDriver)
 	, SpatialLatencyTracer(InSpatialLatencyTracer)
 	, EventTracer(InEventTracer)
@@ -40,7 +40,7 @@ SpatialRPCService::SpatialRPCService(const FSubView& InActorAuthSubView, const F
 	{
 		CrossServerRPCs.Emplace(CrossServerRPCService(ActorCanExtractRPCDelegate::CreateRaw(this, &SpatialRPCService::ActorCanExtractRPC),
 													  ExtractRPCDelegate::CreateRaw(this, &SpatialRPCService::ProcessOrQueueIncomingRPC),
-													  InActorAuthSubView, RPCStore));
+													  InActorAuthSubView, InWorkerEntitySubView, RPCStore));
 	}
 	IncomingRPCs.BindProcessingFunction(FProcessRPCDelegate::CreateRaw(this, &SpatialRPCService::ApplyRPC));
 	OutgoingRPCs.BindProcessingFunction(FProcessRPCDelegate::CreateRaw(this, &SpatialRPCService::SendRPC));

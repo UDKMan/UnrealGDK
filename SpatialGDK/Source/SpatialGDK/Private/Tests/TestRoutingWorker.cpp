@@ -435,11 +435,10 @@ struct RoutingWorkerMock : WorkerMock
 struct ServerWorkerMock : WorkerMock
 {
 	ServerWorkerMock()
-		: SubView(Coordinator.CreateSubView(SpatialConstants::ACTOR_AUTH_TAG_COMPONENT_ID,
-											[](const Worker_EntityId, const SpatialGDK::EntityViewElement&) {
-												return true;
-											},
-											{}))
+		: SubView(Coordinator.CreateSubView(SpatialConstants::ACTOR_AUTH_TAG_COMPONENT_ID, SpatialGDK::FSubView::NoFilter,
+											SpatialGDK::FSubView::NoDispatcherCallbacks))
+		, DummyRoutingWorkerSubView(Coordinator.CreateSubView(SpatialConstants::ROUTINGWORKER_TAG_COMPONENT_ID,
+															  SpatialGDK::FSubView::NoFilter, SpatialGDK::FSubView::NoDispatcherCallbacks))
 	{
 	}
 
@@ -454,6 +453,7 @@ struct ServerWorkerMock : WorkerMock
 	}
 
 	SpatialGDK::FSubView& SubView;
+	SpatialGDK::FSubView& DummyRoutingWorkerSubView;
 };
 
 struct TestRoutingFixture
@@ -554,7 +554,8 @@ ROUTING_SERVICE_TEST(TestRoutingWorker_WhiteBox_SendOneMessage)
 
 	SpatialGDK::FRPCStore RPCStore;
 	SpatialGDK::CrossServerRPCService RPCService(TestFixture.CanExtractDelegate, ExtractRPCDelegate::CreateLambda(ExtractRPCCallback),
-												 TestFixture.ServerWorker.SubView, RPCStore);
+												 TestFixture.ServerWorker.SubView, TestFixture.ServerWorker.DummyRoutingWorkerSubView,
+												 RPCStore);
 
 	RPCServiceBackptr = &RPCService;
 	RPCService.AdvanceView();
@@ -653,7 +654,8 @@ ROUTING_SERVICE_TEST(TestRoutingWorker_BlackBox_SendSeveralMessagesToSeveralEnti
 
 	SpatialGDK::FRPCStore RPCStore;
 	SpatialGDK::CrossServerRPCService RPCService(TestFixture.CanExtractDelegate, ExtractRPCDelegate::CreateLambda(ExtractRPCCallback),
-												 TestFixture.ServerWorker.SubView, RPCStore);
+												 TestFixture.ServerWorker.SubView, TestFixture.ServerWorker.DummyRoutingWorkerSubView,
+												 RPCStore);
 	RPCServiceBackptr = &RPCService;
 	RPCService.AdvanceView();
 	RPCService.ProcessChanges();
@@ -729,7 +731,8 @@ ROUTING_SERVICE_TEST(TestRoutingWorker_BlackBox_SendOneMessageBetweenDeletedEnti
 
 	SpatialGDK::FRPCStore RPCStore;
 	SpatialGDK::CrossServerRPCService RPCService(TestFixture.CanExtractDelegate, ExtractRPCDelegate::CreateLambda(ExtractRPCCallback),
-												 TestFixture.ServerWorker.SubView, RPCStore);
+												 TestFixture.ServerWorker.SubView, TestFixture.ServerWorker.DummyRoutingWorkerSubView,
+												 RPCStore);
 
 	RPCServiceBackptr = &RPCService;
 	RPCService.AdvanceView();
@@ -815,7 +818,8 @@ ROUTING_SERVICE_TEST(TestRoutingWorker_BlackBox_SendMoreMessagesThanRingBufferCa
 
 	SpatialGDK::FRPCStore RPCStore;
 	SpatialGDK::CrossServerRPCService RPCService(TestFixture.CanExtractDelegate, ExtractRPCDelegate::CreateLambda(ExtractRPCCallback),
-												 TestFixture.ServerWorker.SubView, RPCStore);
+												 TestFixture.ServerWorker.SubView, TestFixture.ServerWorker.DummyRoutingWorkerSubView,
+												 RPCStore);
 
 	RPCServiceBackptr = &RPCService;
 

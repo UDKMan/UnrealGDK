@@ -13,6 +13,7 @@
 #include "SpatialGDKSettings.h"
 #include "Utils/ComponentFactory.h"
 #include "Utils/EntityFactory.h"
+#include "Utils/InterestFactory.h"
 #include "Utils/RepDataUtils.h"
 #include "Utils/RepLayoutUtils.h"
 #include "Utils/SchemaUtils.h"
@@ -69,6 +70,7 @@ bool CreateSpawnerEntity(Worker_SnapshotOutputStream* OutputStream)
 	TArray<FWorkerComponentData> Components;
 
 	AuthorityDelegationMap DelegationMap;
+	DelegationMap.Add(SpatialConstants::SPATIALOS_WELLKNOWN_COMPONENTSET_ID, SpatialConstants::INITIAL_SNAPSHOT_PARTITION_ENTITY_ID);
 	DelegationMap.Add(SpatialConstants::GDK_KNOWN_ENTITY_AUTH_COMPONENT_SET_ID, SpatialConstants::INITIAL_SNAPSHOT_PARTITION_ENTITY_ID);
 
 	Components.Add(Position(DeploymentOrigin).CreateComponentData());
@@ -137,6 +139,7 @@ bool CreateGlobalStateManager(Worker_SnapshotOutputStream* OutputStream)
 	TArray<FWorkerComponentData> Components;
 
 	AuthorityDelegationMap DelegationMap;
+	DelegationMap.Add(SpatialConstants::SPATIALOS_WELLKNOWN_COMPONENTSET_ID, SpatialConstants::INITIAL_SNAPSHOT_PARTITION_ENTITY_ID);
 	DelegationMap.Add(SpatialConstants::GDK_KNOWN_ENTITY_AUTH_COMPONENT_SET_ID, SpatialConstants::INITIAL_SNAPSHOT_PARTITION_ENTITY_ID);
 
 	Components.Add(Position(DeploymentOrigin).CreateComponentData());
@@ -182,6 +185,7 @@ bool CreateVirtualWorkerTranslator(Worker_SnapshotOutputStream* OutputStream)
 	TArray<FWorkerComponentData> Components;
 
 	AuthorityDelegationMap DelegationMap;
+	DelegationMap.Add(SpatialConstants::SPATIALOS_WELLKNOWN_COMPONENTSET_ID, SpatialConstants::INITIAL_SNAPSHOT_PARTITION_ENTITY_ID);
 	DelegationMap.Add(SpatialConstants::GDK_KNOWN_ENTITY_AUTH_COMPONENT_SET_ID, SpatialConstants::INITIAL_SNAPSHOT_PARTITION_ENTITY_ID);
 
 	Components.Add(Position(DeploymentOrigin).CreateComponentData());
@@ -209,6 +213,7 @@ bool CreateSnapshotPartitionEntity(Worker_SnapshotOutputStream* OutputStream)
 	TArray<FWorkerComponentData> Components;
 
 	AuthorityDelegationMap DelegationMap;
+	DelegationMap.Add(SpatialConstants::SPATIALOS_WELLKNOWN_COMPONENTSET_ID, SpatialConstants::INITIAL_SNAPSHOT_PARTITION_ENTITY_ID);
 	DelegationMap.Add(SpatialConstants::GDK_KNOWN_ENTITY_AUTH_COMPONENT_SET_ID, SpatialConstants::INITIAL_SNAPSHOT_PARTITION_ENTITY_ID);
 
 	Components.Add(Position(DeploymentOrigin).CreateComponentData());
@@ -219,6 +224,28 @@ bool CreateSnapshotPartitionEntity(Worker_SnapshotOutputStream* OutputStream)
 	SetEntityData(SnapshotPartitionEntity, Components);
 
 	Worker_SnapshotOutputStream_WriteEntity(OutputStream, &SnapshotPartitionEntity);
+	return Worker_SnapshotOutputStream_GetState(OutputStream).stream_state == WORKER_STREAM_STATE_GOOD;
+}
+
+bool CreateRoutingWorkerPartitionEntity(Worker_SnapshotOutputStream* OutputStream)
+{
+	Worker_Entity StrategyPartitionEntity;
+	StrategyPartitionEntity.entity_id = SpatialConstants::INITIAL_ROUTING_PARTITION_ENTITY_ID;
+
+	AuthorityDelegationMap DelegationMap;
+	DelegationMap.Add(SpatialConstants::SPATIALOS_WELLKNOWN_COMPONENTSET_ID, SpatialConstants::INITIAL_ROUTING_PARTITION_ENTITY_ID);
+	DelegationMap.Add(SpatialConstants::GDK_KNOWN_ENTITY_AUTH_COMPONENT_SET_ID, SpatialConstants::INITIAL_ROUTING_PARTITION_ENTITY_ID);
+
+	TArray<FWorkerComponentData> Components;
+	Components.Add(Position().CreateComponentData());
+	Components.Add(Metadata(FString(TEXT("RoutingPartition"))).CreateComponentData());
+	Components.Add(AuthorityDelegation(DelegationMap).CreateComponentData());
+	Components.Add(InterestFactory::CreateRoutingWorkerInterest().CreateComponentData());
+	Components.Add(Persistence().CreateComponentData());
+
+	SetEntityData(StrategyPartitionEntity, Components);
+
+	Worker_SnapshotOutputStream_WriteEntity(OutputStream, &StrategyPartitionEntity);
 	return Worker_SnapshotOutputStream_GetState(OutputStream).stream_state == WORKER_STREAM_STATE_GOOD;
 }
 
@@ -290,6 +317,13 @@ bool FillSnapshot(Worker_SnapshotOutputStream* OutputStream, UWorld* World)
 	if (!CreateSnapshotPartitionEntity(OutputStream))
 	{
 		UE_LOG(LogSpatialGDKSnapshot, Error, TEXT("Error generating SnapshotPartitionEntity in snapshot: %s"),
+			   UTF8_TO_TCHAR(Worker_SnapshotOutputStream_GetState(OutputStream).error_message));
+		return false;
+	}
+
+	if (!CreateRoutingWorkerPartitionEntity(OutputStream))
+	{
+		UE_LOG(LogSpatialGDKSnapshot, Error, TEXT("Error generating RoutingPartitionEntity in snapshot: %s"),
 			   UTF8_TO_TCHAR(Worker_SnapshotOutputStream_GetState(OutputStream).error_message));
 		return false;
 	}

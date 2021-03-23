@@ -507,8 +507,12 @@ void USpatialNetDriver::CreateAndInitializeCoreClasses()
 		const SpatialGDK::FSubView& SystemEntitySubview = Connection->GetCoordinator().CreateSubView(
 			SpatialConstants::SYSTEM_COMPONENT_ID, SpatialGDK::FSubView::NoFilter, SpatialGDK::FSubView::NoDispatcherCallbacks);
 
-		RPCService = MakeUnique<SpatialGDK::SpatialRPCService>(ActorAuthSubview, ActorSubview, USpatialLatencyTracer::GetTracer(GetWorld()),
-															   Connection->GetEventTracer(), this);
+		const SpatialGDK::FSubView& WorkerEntitySubView = Connection->GetCoordinator().CreateSubView(
+			SpatialConstants::ROUTINGWORKER_TAG_COMPONENT_ID, SpatialGDK::FSubView::NoFilter, SpatialGDK::FSubView::NoDispatcherCallbacks);
+
+		RPCService =
+			MakeUnique<SpatialGDK::SpatialRPCService>(ActorAuthSubview, ActorSubview, WorkerEntitySubView,
+													  USpatialLatencyTracer::GetTracer(GetWorld()), Connection->GetEventTracer(), this);
 
 		CrossServerRPCSender =
 			MakeUnique<SpatialGDK::CrossServerRPCSender>(Connection->GetCoordinator(), SpatialMetrics, Connection->GetEventTracer());
@@ -1808,76 +1812,100 @@ void USpatialNetDriver::ProcessRPC(AActor* Actor, UObject* SubObject, UFunction*
 		const bool bIsUnordered = Function->HasAnySpatialFunctionFlags(SPATIALFUNC_ExplicitelyUnordered);
 		const bool bIsReliable = Function->HasAnyFunctionFlags(FUNC_NetReliable);
 
-		if ((!bUseEntityInteractionSemantics || !bIsReliable || bIsUnordered) && !bIsNetWriteFence)
+		bool bNeedSender = bUseEntityInteractionSemantics && ((bIsReliable && !bIsUnordered) || bIsNetWriteFence);
+
+		if (!bNeedSender && !bIsReliable)
 		{
-			if (bUseEntityInteractionSemantics && bIsReliable)
-			{
-				// Unordered == missing sender
-				// Implementing this in a reliable fashion requires some kind of "sender" entity per worker.
-				// To implement in UNR-XXXX
-				UE_LOG(LogSpatialOSNetDriver, Warning,
-					   TEXT("Unordered reliable RPC %s on target %s will be sent through an unreliable channel (TODO UNR-XXXX)"),
-					   *Function->GetName(), *Actor->GetName());
-			}
 			CrossServerRPCSender->SendCommand(MoveTemp(CallingObjectRef), CallingObject, Function, MoveTemp(Payload), Info);
 			return;
 		}
-		else //( (bUseInteractionSemantics && bIsReliable && !bIsUnordered) || bIsNetWriteFence)
+		else // bNeedSender || bIsReliable
 		{
-			AActor* SenderActor = nullptr;
+			bool bHasSenderAvailable = GSenderStack.Num() > 0 && !GSenderStack.Last().bHasBeenUsed;
 
-			if (GSenderStack.Num() == 0)
+			if (bIsUnordered)
 			{
-				UE_LOG(LogSpatialOSNetDriver, Error, TEXT("Missing sender Actor to call RPC %s on target %s"), *Function->GetName(),
-					   *Actor->GetName());
-				return;
+				SenderInfo.Entity = WorkerEntityId;
+			}
+			else if (!bHasSenderAvailable)
+			{
+				if (bIsNetWriteFence)
+				{
+					UE_LOG(LogSpatialOSNetDriver, Warning,
+						   TEXT("Net write fence %s on target %s will be executed immediately because no sender was provided"),
+						   *Function->GetName(), *Actor->GetName());
+
+					CallingObject->ProcessEvent(Function, Parameters);
+					return;
+				}
+				else
+				{
+					UE_LOG(LogSpatialOSNetDriver, Warning,
+						   TEXT("Ordered reliable RPC %s on target %s will be sent unordered because no sender was provided"),
+						   *Function->GetName(), *Actor->GetName());
+
+					SenderInfo.Entity = WorkerEntityId;
+				}
 			}
 			else
 			{
-				SenderActorDesc& Desc = GSenderStack.Last();
-				SenderActor = Desc.Actor;
+				AActor* SenderActor = nullptr;
 
-				if (bIsNetWriteFence != Desc.bIsDependent)
+				if (GSenderStack.Num() == 0)
 				{
-					UE_LOG(LogSpatialOSNetDriver, Error,
-						   TEXT("Wrong kind of sender Actor set to call RPC %s on target %s."
+					UE_LOG(LogSpatialOSNetDriver, Error, TEXT("Missing sender Actor to call RPC %s on target %s"), *Function->GetName(),
+						   *Actor->GetName());
+					return;
+				}
+				else
+				{
+					SenderActorDesc& Desc = GSenderStack.Last();
+					SenderActor = Desc.Actor;
+
+					if (!ensure(!Desc.bHasBeenUsed))
+					{
+						UE_LOG(LogSpatialOSNetDriver, Error,
+							   TEXT("(INTERNAl GDK ERROR) Wrong stack semantics when calling RPC %s on Actor %s."
+									"The sender Actor is supposed to be used only once in a RPC case"),
+							   *Function->GetName(), *Actor->GetName());
+						return;
+					}
+
+					Desc.bHasBeenUsed = true;
+
+					if (bIsNetWriteFence != Desc.bIsDependent)
+					{
+						UE_LOG(
+							LogSpatialOSNetDriver, Error,
+							TEXT(
+								"Wrong kind of sender Actor set to call RPC %s on target %s."
 								"Check that the right AActor function was used with the right kind of RPC (CrossServer and NetWriteFence)"),
-						   *Function->GetName(), *Actor->GetName());
-					return;
+							*Function->GetName(), *Actor->GetName());
+						return;
+					}
 				}
 
-				if (!ensure(!Desc.bHasBeenUsed))
+				if (SenderActor == nullptr)
 				{
-					UE_LOG(LogSpatialOSNetDriver, Error,
-						   TEXT("(INTERNAl GDK ERROR) Wrong stack semantics when calling RPC %s on Actor %s."
-								"The sender Actor is supposed to be used only once in a RPC case"),
-						   *Function->GetName(), *Actor->GetName());
+					UE_LOG(LogSpatialOSNetDriver, Error, TEXT("Null sender Actor set to call RPC %s on target %s"), *Function->GetName(),
+						   *Actor->GetName());
 					return;
 				}
 
-				Desc.bHasBeenUsed = true;
-			}
+				if (SenderActor && !SenderActor->HasAuthority())
+				{
+					UE_LOG(LogSpatialOSNetDriver, Error, TEXT("No authority on sender Actor %s to call RPC %s on target %s"),
+						   *SenderActor->GetName(), *Function->GetName(), *Actor->GetName());
+					return;
+				}
 
-			if (SenderActor == nullptr)
-			{
-				UE_LOG(LogSpatialOSNetDriver, Error, TEXT("Null sender Actor set to call RPC %s on target %s"), *Function->GetName(),
-					   *Actor->GetName());
-				return;
-			}
+				if (bIsNetWriteFence)
+				{
+					SenderActor->ForceNetUpdate();
+				}
 
-			if (SenderActor && !SenderActor->HasAuthority())
-			{
-				UE_LOG(LogSpatialOSNetDriver, Error, TEXT("No authority on sender Actor %s to call RPC %s on target %s"),
-					   *SenderActor->GetName(), *Function->GetName(), *Actor->GetName());
-				return;
+				SenderInfo.Entity = PackageMap->GetUnrealObjectRefFromObject(SenderActor).Entity;
 			}
-
-			if (bIsNetWriteFence)
-			{
-				SenderActor->ForceNetUpdate();
-			}
-
-			SenderInfo.Entity = PackageMap->GetUnrealObjectRefFromObject(SenderActor).Entity;
 		}
 	}
 
@@ -2881,6 +2909,7 @@ void USpatialNetDriver::DelayedRetireEntity(Worker_EntityId EntityId, float Dela
 		Delay, false);
 }
 
+#if 0
 void USpatialNetDriver::QueryRoutingPartition()
 {
 	if (bRoutingWorkerQueryInFlight)
@@ -3005,6 +3034,8 @@ void USpatialNetDriver::QueryRoutingPartition()
 	}
 }
 
+#endif
+
 void USpatialNetDriver::TryFinishStartup()
 {
 	// Limit Log frequency.
@@ -3052,15 +3083,19 @@ void USpatialNetDriver::TryFinishStartup()
 			{
 				UE_CLOG(bShouldLogStartup, LogSpatialOSNetDriver, Log, TEXT("Waiting for the partition entity to be ready."));
 			}
-			else if (Settings->CrossServerRPCImplementation == ECrossServerRPCImplementation::RoutingWorker && RoutingPartition == 0)
-			{
-				QueryRoutingPartition();
-			}
+			// else if (Settings->CrossServerRPCImplementation == ECrossServerRPCImplementation::RoutingWorker && RoutingPartition == 0)
+			//{
+			//	QueryRoutingPartition();
+			//}
 			else
 			{
 				UE_LOG(LogSpatialOSNetDriver, Log, TEXT("Ready to begin processing."));
 				bIsReadyToStart = true;
 				Connection->SetStartupComplete();
+				// if (Settings->CrossServerRPCImplementation == ECrossServerRPCImplementation::RoutingWorker)
+				//{
+				//	Sender->UpdateWorkerEntityAuthorityDelegation(WorkerEntityId, RoutingPartition);
+				//}
 
 #if WITH_EDITORONLY_DATA
 				ASpatialWorldSettings* WorldSettings = Cast<ASpatialWorldSettings>(GetWorld()->GetWorldSettings());
@@ -3221,10 +3256,10 @@ FUnrealObjectRef USpatialNetDriver::GetCurrentPlayerControllerRef()
 	return FUnrealObjectRef::NULL_OBJECT_REF;
 }
 
-Worker_PartitionId USpatialNetDriver::GetRoutingPartition()
-{
-	return RoutingPartition;
-}
+// Worker_PartitionId USpatialNetDriver::GetRoutingPartition()
+//{
+//	return RoutingPartition;
+//}
 
 void USpatialNetDriver::PushCrossServerRPCSender(AActor* SenderActor)
 {
