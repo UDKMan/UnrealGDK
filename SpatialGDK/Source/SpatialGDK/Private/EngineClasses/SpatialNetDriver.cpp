@@ -511,10 +511,6 @@ void USpatialNetDriver::CreateAndInitializeCoreClasses()
 		const SpatialGDK::FSubView& SystemEntitySubview = Connection->GetCoordinator().CreateSubView(
 			SpatialConstants::SYSTEM_COMPONENT_ID, SpatialGDK::FSubView::NoFilter, SpatialGDK::FSubView::NoDispatcherCallbacks);
 
-		SpatialGDK::FSubView& WellKnownSubView =
-            Connection->GetCoordinator().CreateSubView(SpatialConstants::GDK_KNOWN_ENTITY_TAG_COMPONENT_ID, SpatialGDK::FSubView::NoFilter,
-                                                       SpatialGDK::FSubView::NoDispatcherCallbacks);
-
 		RPCService = MakeUnique<SpatialGDK::SpatialRPCService>(ActorAuthSubview, ActorSubview, USpatialLatencyTracer::GetTracer(GetWorld()),
 															   Connection->GetEventTracer(), this);
 
@@ -528,14 +524,6 @@ void USpatialNetDriver::CreateAndInitializeCoreClasses()
 		ActorSystem = MakeUnique<SpatialGDK::ActorSystem>(ActorSubview, TombstoneActorSubview, this, Connection->GetEventTracer());
 
 		ClientConnectionManager = MakeUnique<SpatialGDK::ClientConnectionManager>(SystemEntitySubview, this);
-
-		if (!IsServer())
-		{
-			const SpatialGDK::FSubView& PlayerControllerSubview =
-				Connection->GetCoordinator().CreateSubView(SpatialConstants::PLAYER_CONTROLLER_SERVER_COMPONENT_ID,
-														   SpatialGDK::FSubView::NoFilter, SpatialGDK::FSubView::NoDispatcherCallbacks);
-			ServerCrashHandler = MakeUnique<SpatialGDK::ServerCrashHandler>(WellKnownSubView, PlayerControllerSubview, this);
-		}
 
 		Dispatcher->Init(StaticComponentView, SpatialWorkerFlags);
 		Sender->Init(this, &TimerManager, Connection->GetEventTracer());
@@ -561,13 +549,23 @@ void USpatialNetDriver::CreateAndInitializeCoreClasses()
 		// The interest factory depends on the package map, so is created last.
 		InterestFactory = MakeUnique<SpatialGDK::InterestFactory>(ClassInfoManager, PackageMap);
 
-		if (!IsServer())
-		{
-			return;
-		}
+		SpatialGDK::FSubView& WellKnownSubView =
+			Connection->GetCoordinator().CreateSubView(SpatialConstants::GDK_KNOWN_ENTITY_TAG_COMPONENT_ID, SpatialGDK::FSubView::NoFilter,
+													   SpatialGDK::FSubView::NoDispatcherCallbacks);
 
-		WellKnownEntitySystem = MakeUnique<SpatialGDK::WellKnownEntitySystem>(
-			WellKnownSubView, SystemEntitySubview, Connection, LoadBalanceStrategy->GetMinimumRequiredWorkers(), *VirtualWorkerTranslator, *GlobalStateManager);
+		if (IsServer())
+		{
+			WellKnownEntitySystem = MakeUnique<SpatialGDK::WellKnownEntitySystem>(WellKnownSubView, SystemEntitySubview, Connection,
+																				  LoadBalanceStrategy->GetMinimumRequiredWorkers(),
+																				  *VirtualWorkerTranslator, *GlobalStateManager);
+		}
+		else
+		{
+			const SpatialGDK::FSubView& PlayerControllerSubview =
+				Connection->GetCoordinator().CreateSubView(SpatialConstants::PLAYER_CONTROLLER_SERVER_COMPONENT_ID,
+														   SpatialGDK::FSubView::NoFilter, SpatialGDK::FSubView::NoDispatcherCallbacks);
+			ServerCrashHandler = MakeUnique<SpatialGDK::ServerCrashHandler>(WellKnownSubView, PlayerControllerSubview, this);
+		}
 	}
 }
 
