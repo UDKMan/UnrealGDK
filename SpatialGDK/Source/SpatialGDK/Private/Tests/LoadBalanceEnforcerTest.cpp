@@ -53,9 +53,9 @@ TUniquePtr<SpatialVirtualWorkerTranslator> CreateVirtualWorkerTranslator()
 									   SpatialConstants::INVALID_ENTITY_ID };
 
 	const TArray<SpatialGDK::VirtualWorkerInfo> VirtualWorkerList{ VirtualWorkerOne, VirtualWorkerTwo };
-	const SpatialGDK::VirtualWorkerTranslation TranslationData = SpatialGDK::VirtualWorkerTranslation(VirtualWorkerList);
+	const SpatialGDK::VirtualWorkerTranslation TranslationData(VirtualWorkerList, 0);
 
-	VirtualWorkerTranslator->ApplyVirtualWorkerManagerData(TranslationData);
+	VirtualWorkerTranslator->ApplyVirtualWorkerTranslation(TranslationData);
 
 	return VirtualWorkerTranslator;
 }

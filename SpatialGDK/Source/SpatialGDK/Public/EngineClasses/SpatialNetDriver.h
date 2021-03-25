@@ -6,6 +6,7 @@
 #include "Interop/Connection/ConnectionConfig.h"
 #include "Interop/CrossServerRPCSender.h"
 #include "Interop/EntityQueryHandler.h"
+#include "Interop/ServerCrashHandler.h"
 #include "Utils/SpatialBasicAwaiter.h"
 #include "Utils/SpatialDebugger.h"
 
@@ -226,6 +227,7 @@ public:
 
 	TUniquePtr<SpatialGDK::WellKnownEntitySystem> WellKnownEntitySystem;
 	TUniquePtr<SpatialGDK::ClientConnectionManager> ClientConnectionManager;
+	TUniquePtr<SpatialGDK::ServerCrashHandler> ServerCrashHandler;
 	TUniquePtr<SpatialGDK::InitialOnlyFilter> InitialOnlyFilter;
 
 	Worker_EntityId WorkerEntityId = SpatialConstants::INVALID_ENTITY_ID;
@@ -289,7 +291,7 @@ private:
 	bool bMapLoaded;
 
 	FString SnapshotToLoad;
-	
+
 	// Client variable which stores the SessionId given to us by the server in the URL options.
 	// Used to compare against the GSM SessionId to ensure the the server is ready to spawn players.
 	int32 SessionId;
