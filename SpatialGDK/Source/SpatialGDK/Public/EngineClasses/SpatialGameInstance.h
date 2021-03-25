@@ -78,8 +78,9 @@ public:
 	FOnPrepareShutdownEvent OnPrepareShutdown;
 
 	void DisableShouldConnectUsingCommandLineArgs() { bShouldConnectUsingCommandLineArgs = false; }
-	bool GetShouldConnectUsingCommandLineArgs() const { return bShouldConnectUsingCommandLineArgs; }
-
+	// IMP-BEGIN Enable overriding whether to avoid CLI connection config
+	virtual bool GetShouldConnectUsingCommandLineArgs() const { return bShouldConnectUsingCommandLineArgs; }
+	// IMP-END
 	void TryInjectSpatialLocatorIntoCommandLine();
 
 protected:

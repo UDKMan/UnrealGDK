@@ -855,6 +855,12 @@ void USpatialReceiver::ReceiveActor(Worker_EntityId EntityId)
 		// This could be nullptr if:
 		// a stably named actor could not be found
 		// the class couldn't be loaded
+		// IMP-BEGIN Print error on failure to find stably named Actor
+		UE_LOG(LogSpatialReceiver, Error,
+			   TEXT("TryGetOrCreateActor returned nullptr. Either stably named Actor couldn't be found or class couldn't be loaded. "
+					"Entity: %lld"),
+			   EntityId);
+		// IMP-END
 		return;
 	}
 
@@ -1579,6 +1585,9 @@ void USpatialReceiver::OnComponentUpdate(const Worker_ComponentUpdateOp& Op)
 	case SpatialConstants::NOT_STREAMED_COMPONENT_ID:
 	case SpatialConstants::DEBUG_METRICS_COMPONENT_ID:
 	case SpatialConstants::ALWAYS_RELEVANT_COMPONENT_ID:
+	// IMP-BEGIN Fix Dormant component updates not filtered out
+	case SpatialConstants::DORMANT_COMPONENT_ID:
+	// IMP-END
 	case SpatialConstants::SERVER_ONLY_ALWAYS_RELEVANT_COMPONENT_ID:
 	case SpatialConstants::VISIBLE_COMPONENT_ID:
 	case SpatialConstants::SPATIAL_DEBUGGING_COMPONENT_ID:
@@ -1962,7 +1971,21 @@ void USpatialReceiver::ReceiveWorkerDisconnectResponse(const Worker_CommandRespo
 
 void USpatialReceiver::ReceiveClaimPartitionResponse(const Worker_CommandResponseOp& Op)
 {
-	const Worker_PartitionId PartitionId = PendingPartitionAssignments.FindAndRemoveChecked(Op.request_id);
+	// IMP-BEGIN Avoid claim partition response crash
+	if (Op.request_id < 0)
+	{
+		// Invalid request id that will not be in PendingPartitionAssignments
+		return;
+	}
+
+	Worker_PartitionId PartitionId;
+	if (!PendingPartitionAssignments.RemoveAndCopyValue(Op.request_id, PartitionId))
+	{
+		UE_LOG(LogSpatialVirtualWorkerTranslationManager, Log,
+			TEXT("Could not find request id in PendingPartitionAssignments. Request Id: %d"), Op.request_id);
+		return;
+	}
+	// IMP-END
 
 	if (Op.status_code != WORKER_STATUS_CODE_SUCCESS)
 	{

@@ -77,7 +77,9 @@ protected:
 	UPROPERTY(EditDefaultsOnly, meta = (ClampMin = "0"), Category = "Grid Based Load Balancing")
 	float InterestBorder;
 
-private:
+// IMP-BEGIN Make grid based lb variables visible to subclasses
+protected:
+// IMP-END
 	TArray<VirtualWorkerId> VirtualWorkerIds;
 
 	TArray<FBox2D> WorkerCells;

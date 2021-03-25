@@ -81,6 +81,10 @@ struct ConfigureConnection
 		Params.network.kcp.security_type = WORKER_NETWORK_SECURITY_TYPE_INSECURE;
 		Params.network.tcp.security_type = WORKER_NETWORK_SECURITY_TYPE_INSECURE;
 
+		// IMP-BEGIN Increase server connection timeout
+		Params.network.connection_timeout_millis = 600000;
+		// IMP-END
+
 		// Override the security type to be secure only if the user has requested it and we are not using an editor build.
 		if ((!bConnectAsClient && GetDefault<USpatialGDKSettings>()->bUseSecureServerConnection)
 			|| (bConnectAsClient && GetDefault<USpatialGDKSettings>()->bUseSecureClientConnection))

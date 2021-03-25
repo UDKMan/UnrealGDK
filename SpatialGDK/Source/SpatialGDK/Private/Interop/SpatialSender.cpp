@@ -629,9 +629,16 @@ void USpatialSender::SendAuthorityIntentUpdate(const AActor& Actor, VirtualWorke
 
 	AuthorityIntent* AuthorityIntentComponent = StaticComponentView->GetComponentData<AuthorityIntent>(EntityId);
 	check(AuthorityIntentComponent != nullptr);
-	checkf(AuthorityIntentComponent->VirtualWorkerId != NewAuthoritativeVirtualWorkerId,
-		   TEXT("Attempted to update AuthorityIntent twice to the same value. Actor: %s. Entity ID: %lld. Virtual worker: '%d'"),
-		   *GetNameSafe(&Actor), EntityId, NewAuthoritativeVirtualWorkerId);
+
+	// IMP-BEGIN Avoid check when duplicate setting authority intent
+	if (AuthorityIntentComponent->VirtualWorkerId == NewAuthoritativeVirtualWorkerId)
+	{
+		UE_LOG(LogSpatialSender, Error,
+			   TEXT("Attempted to update AuthorityIntent twice to the same value. Actor: %s. Entity ID: %lld. Virtual worker: '%d'"),
+			   *GetNameSafe(&Actor), EntityId, NewAuthoritativeVirtualWorkerId);
+		return;
+	}
+	// IMP-END
 
 	AuthorityIntentComponent->VirtualWorkerId = NewAuthoritativeVirtualWorkerId;
 	UE_LOG(LogSpatialSender, Log,

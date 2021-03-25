@@ -53,6 +53,10 @@ public:
 	virtual uint32 GetMinimumRequiredWorkers() const override;
 	virtual void SetVirtualWorkerIds(const VirtualWorkerId& FirstVirtualWorkerId, const VirtualWorkerId& LastVirtualWorkerId) override;
 
+	// IMP-BEGIN Reimplementing GetDefaultStrategy function
+	UAbstractLBStrategy* GetDefaultStrategy() const;
+	// IMP-END
+
 	// This returns the LBStrategy which should be rendered in the SpatialDebugger.
 	// Currently, this is just the default strategy.
 	UAbstractLBStrategy* GetLBStrategyForVisualRendering() const override;

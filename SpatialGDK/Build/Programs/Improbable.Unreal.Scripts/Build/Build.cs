@@ -27,7 +27,9 @@ namespace Improbable
 
             if (help)
             {
-                Console.WriteLine("Usage: <GameName> <Platform> <Configuration> <game.uproject> [-nobuild] [-nocompile] <Additional UAT args>");
+                // IMP-BEGIN Filebeat
+                Console.WriteLine("Usage: <GameName> <Platform> <Configuration> <game.uproject> [-filebeat] [-nobuild] [-nocompile] <Additional UAT args>");
+                // IMP-END
 
                 Environment.Exit(exitCode);
             }
@@ -36,6 +38,9 @@ namespace Improbable
             var platform = args[1];
             var configuration = args[2];
             var projectFile = Path.GetFullPath(args[3]);
+            // IMP-BEGIN Filebeat
+            var installFilebeat = args.Count(arg => arg.ToLowerInvariant() == "-filebeat") > 0;
+            // IMP-END
             var noBuild = args.Count(arg => arg.ToLowerInvariant() == "-nobuild") > 0;
             var noCompile = args.Count(arg => arg.ToLowerInvariant() == "-nocompile") > 0;
             var noServer = args.Count(arg => arg.ToLowerInvariant() == "-noserver") > 0;
@@ -164,7 +169,9 @@ exit /b !ERRORLEVEL!";
                     "-cook",
                     "-stage",
                     "-package",
-                    "-unversioned",
+                    // IMP-BEGIN Unnecessary build args
+                    // "-unversioned",
+                    // IMP-END
                     "-compressed",
                     "-stagingdirectory=" + Quote(stagingDir),
                     "-stdout",
@@ -207,8 +214,10 @@ exit /b !ERRORLEVEL!";
                     "-cook",
                     "-stage",
                     "-package",
-                    "-unversioned",
-                    "-compressed",
+                    // IMP-BEGIN Unnecessary build args
+                    // "-unversioned",
+                    // "-compressed",
+                    // IMP-END
                     "-stagingdirectory=" + Quote(stagingDir),
                     "-stdout",
                     "-FORCELOGFLUSH",
@@ -272,7 +281,9 @@ exit /b !ERRORLEVEL!";
                     "-cook",
                     "-stage",
                     "-package",
-                    "-unversioned",
+                    // IMP-BEGIN Unnecessary build args
+                    // "-unversioned",
+                    // IMP-END
                     "-compressed",
                     "-stagingdirectory=" + Quote(stagingDir),
                     "-stdout",
@@ -295,6 +306,32 @@ exit /b !ERRORLEVEL!";
 
                 if (isLinux)
                 {
+                    // IMP-BEGIN Filebeat
+                    if(installFilebeat)
+                    {
+                        Common.WriteHeading(" > Copying filebeat to staging.");
+                        Common.RunRedirectedWithExitCode("robocopy", new[]
+                        {
+                                "../filebeat-sidecar",
+                                serverPath,
+                                "/e",
+                                "/a-:R",
+                                "/it",
+                                "/is",
+                                "/ns",
+                                "/nc",
+                                "/nfl",
+                                "/ndl",
+                                "/np"
+                        });
+
+                        // Replace CLRF line endings with LF in the start script
+                        string scriptPath = Path.Combine(serverPath, "StartSidecarThenWorker.sh");
+                        string scriptContents = File.ReadAllText(scriptPath);
+                        LinuxScripts.WriteWithLinuxLineEndings(scriptContents, scriptPath);
+                    }
+                    // IMP-END
+                    
                     // Write out the wrapper shell script to work around issues between UnrealEngine and our cloud Linux environments.
                     // Also ensure script uses Linux line endings
                     LinuxScripts.WriteWithLinuxLineEndings(LinuxScripts.GetUnrealWorkerShellScript(baseGameName), Path.Combine(serverPath, "StartWorker.sh"));
@@ -323,8 +360,10 @@ exit /b !ERRORLEVEL!";
                     "-cook",
                     "-stage",
                     "-package",
-                    "-unversioned",
-                    "-compressed",
+                    // IMP-BEGIN Unnecessary build args
+                    // "-unversioned",
+                    // "-compressed",
+                    // IMP-END
                     "-stagingdirectory=" + Quote(stagingDir),
                     "-stdout",
                     "-FORCELOGFLUSH",
@@ -343,14 +382,16 @@ exit /b !ERRORLEVEL!";
 
                 ForceSpatialNetworkingUnlessPakSpecified(additionalUATArgs, windowsClientPath, baseGameName);
 
-                RenameExeForLauncher(windowsClientPath, baseGameName + "Client");
+                // IMP-BEGIN Don't zip client builds
+                // RenameExeForLauncher(windowsClientPath, baseGameName + "Client");
 
-                Common.RunRedirected(runUATBat, new[]
-                {
-                    "ZipUtils",
-                    "-add=" + Quote(windowsClientPath),
-                    "-archive=" + Quote(Path.Combine(outputDir, "UnrealClient@Windows.zip")),
-                });
+                // Common.RunRedirected(runUATBat, new[]
+                // {
+                //     "ZipUtils",
+                //     "-add=" + Quote(windowsClientPath),
+                //     "-archive=" + Quote(Path.Combine(outputDir, "UnrealClient@Windows.zip")),
+                // });
+                // IMP-END
             }
             else
             {

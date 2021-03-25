@@ -242,7 +242,9 @@ private:
 	void OnEntityRemoved(const Worker_EntityId EntityId);
 
 	// FDebugDrawDelegate
-	void DrawDebug(UCanvas* Canvas, APlayerController* Controller);
+	// IMP-BEGIN Make SpatialDebugger functions virtual
+	virtual void DrawDebug(UCanvas* Canvas, APlayerController* Controller);
+	// IMP-END
 
 	FVector GetLocalPawnLocation();
 
@@ -260,9 +262,11 @@ private:
 
 	void RevertHoverMaterials();
 
-	void DrawTag(UCanvas* Canvas, const FVector2D& ScreenLocation, const Worker_EntityId EntityId, const FString& ActorName,
-				 const bool bCentre);
-	void DrawDebugLocalPlayer(UCanvas* Canvas);
+	// IMP-BEGIN Make SpatialDebugger functions virtual
+	virtual void DrawTag(UCanvas* Canvas, const FVector2D& ScreenLocation, const Worker_EntityId EntityId, const FString& ActorName,
+						 const bool bCentre);
+	virtual void DrawDebugLocalPlayer(UCanvas* Canvas);
+	// IMP-END
 
 	void CreateWorkerRegions();
 	void DestroyWorkerRegions();

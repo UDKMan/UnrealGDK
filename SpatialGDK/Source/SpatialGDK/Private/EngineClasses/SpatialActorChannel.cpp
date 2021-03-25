@@ -432,14 +432,20 @@ void USpatialActorChannel::UpdateVisibleComponent(AActor* InActor)
 
 	// Unreal applies the following rules (in order) in determining the relevant set of Actors for a player:
 	// If the Actor is hidden (bHidden == true) and the root component does not collide then the Actor is not relevant.
-	// We apply the same rules to add/remove the Visible component to an actor that determines if clients will checkout the actor or
-	// not. Make sure that the Actor is also not always relevant.
-	if (InActor->IsHidden() && (!InActor->GetRootComponent() || !InActor->GetRootComponent()->IsCollisionEnabled())
-		&& !InActor->bAlwaysRelevant)
-	{
-		NetDriver->RefreshActorVisibility(InActor, false);
-	}
-	else
+	// IMP-BEGIN Fix bHidden with rep graph
+	// We apply the same rules to add/remove the Visible component to an actor that determines if clients will checkout
+	// the actor or not. Make sure that the Actor is also not always relevant.
+	// In native Unreal, with replication graph enabled, bHidden isn't respected as described above (from a networking
+	// perspective at least). We add a ReplicationGraph conditional here to accommodated that in Spatial (making sure
+	// hidden Actors are still networked to clients).
+	// if (InActor->IsHidden() && !SpatialGDK::UsingSpatialReplicationGraph(InActor) &&
+	// (!InActor->GetRootComponent() || !InActor->GetRootComponent()->IsCollisionEnabled())
+	// 	&& !InActor->bAlwaysRelevant)
+	// {
+	// 	NetDriver->RefreshActorVisibility(InActor, false);
+	// }
+	// else
+	// IMP-END
 	{
 		NetDriver->RefreshActorVisibility(InActor, true);
 	}
@@ -1067,7 +1073,16 @@ void USpatialActorChannel::SetChannelActor(AActor* InActor, ESetChannelActorFlag
 	}
 
 	// Set up the shadow data for the handover properties. This is used later to compare the properties and send only changed ones.
-	check(!HandoverShadowDataMap.Contains(InActor));
+	// IMP-BEGIN Avoid handover shadow data map check
+	// check(!HandoverShadowDataMap.Contains(InActor));
+	if (HandoverShadowDataMap.Contains(InActor))
+	{
+		UE_LOG(LogSpatialActorChannel, Error,
+			   TEXT("HandoverShadowDataMap already contained Actor %s with id %lld, this shouldn't happen. Calling Empty()."),
+			   *InActor->GetName(), EntityId);
+		HandoverShadowDataMap.FindAndRemoveChecked(InActor);
+	}
+	// IMP-END
 
 	// Create the shadow map, and store a quick access pointer to it
 	const FClassInfo& Info = NetDriver->ClassInfoManager->GetOrCreateClassInfoByClass(InActor->GetClass());
@@ -1081,7 +1096,17 @@ void USpatialActorChannel::SetChannelActor(AActor* InActor, ESetChannelActorFlag
 	{
 		UObject* Subobject = SubobjectInfoPair.Key;
 
-		check(!HandoverShadowDataMap.Contains(Subobject));
+		// IMP-BEGIN Avoid handover shadow data map check
+		// check(!HandoverShadowDataMap.Contains(Subobject));
+		if (HandoverShadowDataMap.Contains(Subobject))
+		{
+			UE_LOG(LogSpatialActorChannel, Error,
+				   TEXT("HandoverShadowDataMap already contained subobject %s of Actor %s with id %lld, this shouldn't happen. Calling "
+						"Empty()."),
+				   *Subobject->GetName(), *InActor->GetName(), EntityId);
+			HandoverShadowDataMap.FindAndRemoveChecked(Subobject);
+		}
+		// IMP-END
 		InitializeHandoverShadowData(HandoverShadowDataMap.Add(Subobject, MakeShared<TArray<uint8>>()).Get(), Subobject);
 	}
 }
@@ -1228,7 +1253,19 @@ void USpatialActorChannel::OnCreateEntityResponse(const Worker_CreateEntityRespo
 		// PlayerController entity as a partition entity so the client can become authoritative over necessary
 		// components (such as client RPC endpoints, heartbeat component, etc).
 		const Worker_EntityId ClientSystemEntityId = SpatialGDK::GetConnectionOwningClientSystemEntityId(Cast<APlayerController>(Actor));
-		check(ClientSystemEntityId != SpatialConstants::INVALID_ENTITY_ID);
+		// IMP-BEGIN Avoid invalid client system entity ID crash
+		// check(ClientSystemEntityId != SpatialConstants::INVALID_ENTITY_ID);
+		if (ClientSystemEntityId == SpatialConstants::INVALID_ENTITY_ID)
+		{
+			UE_LOG(LogSpatialActorChannel, Warning,
+				   TEXT("GetConnectionOwningClientSystemEntityId returned INVALID_ENTITY_ID.  This likely indicates a bug in the Unreal "
+						"GDK and should be reported."
+						"Actor %s, request id: %d, entity id: %lld, message: %s"),
+				   *Actor->GetName(), Op.request_id, Op.entity_id, UTF8_TO_TCHAR(Op.message));
+
+			return;
+		}
+		// IMP-END
 		Sender->SendClaimPartitionRequest(ClientSystemEntityId, Op.entity_id);
 	}
 }

@@ -714,6 +714,13 @@ void ASpatialDebugger::DrawDebug(UCanvas* Canvas, APlayerController* /* Controll
 
 			if (Actor != nullptr)
 			{
+				// IMP-BEGIN Don't show local player hierarchy overheads
+				if (Actor->IsOwnedByClient())
+				{
+					continue;
+				}
+				// IMP-END
+
 				FVector2D ScreenLocation = ProjectActorToScreen(Actor, PlayerLocation);
 				if (ScreenLocation.IsZero())
 				{
@@ -980,6 +987,14 @@ void ASpatialDebugger::DrawDebugLocalPlayer(UCanvas* Canvas)
 	for (int32 i = 0; i < ActorsToDisplay.Num(); ++i)
 	{
 		const Worker_EntityId EntityId = NetDriver->PackageMap->GetEntityIdFromObject(ActorsToDisplay[i]);
+		// IMP-BEGIN Adding endpoint position
+		FString TagText = ActorsToDisplay[i]->GetName();
+		if (TagText.Contains(TEXT("SpatialEndpoint")))
+		{
+			TagText.Append(TEXT(" "));
+			TagText.Append(ActorsToDisplay[i]->GetActorLocation().ToString());
+		}
+		// IMP-END
 		DrawTag(Canvas, ScreenLocation, EntityId, ActorsToDisplay[i]->GetName(), false /*bCentre*/);
 		ScreenLocation.Y += PLAYER_TAG_VERTICAL_OFFSET;
 	}

@@ -118,8 +118,14 @@ VirtualWorkerId ULayeredLBStrategy::WhoShouldHaveAuthority(const AActor& Actor) 
 
 	const VirtualWorkerId ReturnedWorkerId = LayerNameToLBStrategy[LayerName]->WhoShouldHaveAuthority(*RootOwner);
 
-	UE_LOG(LogLayeredLBStrategy, Log, TEXT("LayeredLBStrategy returning virtual worker id %d for Actor %s."), ReturnedWorkerId,
-		   *AActor::GetDebugName(RootOwner));
+	// IMP-BEGIN Avoid load balancing log
+	if (ReturnedWorkerId != SpatialConstants::INVALID_VIRTUAL_WORKER_ID)
+	{
+		UE_LOG(LogLayeredLBStrategy, Log, TEXT("LayeredLBStrategy returning virtual worker id %d for Actor %s."), ReturnedWorkerId,
+			   *AActor::GetDebugName(RootOwner));
+	}
+	// IMP-END
+
 	return ReturnedWorkerId;
 }
 
@@ -230,6 +236,13 @@ bool ULayeredLBStrategy::CouldHaveAuthority(const TSubclassOf<AActor> Class) con
 	return *VirtualWorkerIdToLayerName.Find(LocalVirtualWorkerId) == GetLayerNameForClass(Class);
 }
 
+// IMP-BEGIN Reimplementing GetDefaultStrategy function
+UAbstractLBStrategy* ULayeredLBStrategy::GetDefaultStrategy() const
+{
+	return GetLBStrategyForLayer(SpatialConstants::DefaultLayer);
+}
+// IMP-END
+
 UAbstractLBStrategy* ULayeredLBStrategy::GetLBStrategyForVisualRendering() const
 {
 	// The default strategy is guaranteed to exist as long as the strategy is ready.
@@ -251,6 +264,11 @@ UAbstractLBStrategy* ULayeredLBStrategy::GetLBStrategyForLayer(FName Layer) cons
 	{
 		return *Entry;
 	}
+
+	// IMP-BEGIN Add error log for failure to lookup lb layer
+	UE_LOG(LogLayeredLBStrategy, Warning, TEXT("No strategy exists for layer %s"), *Layer.ToString());
+	// IMP-END
+
 	return nullptr;
 }
 

@@ -8,6 +8,9 @@
 #endif
 
 #include "Engine/Classes/AI/AISystemBase.h"
+// IMP-BEGIN Ensure sublevel world settings' authority is set correctly
+#include "Engine/LevelStreaming.h"
+// IMP-END
 #include "Engine/World.h"
 #include "EngineClasses/SpatialActorChannel.h"
 #include "EngineClasses/SpatialNetConnection.h"
@@ -441,6 +444,23 @@ void UGlobalStateManager::TriggerBeginPlay()
 	{
 		HandleActorBasedOnLoadBalancer(*ActorIterator);
 	}
+
+	// IMP-BEGIN Ensure sublevel world settings' authority is set correctly
+	const TArray<ULevelStreaming*>& StreamingLevels = NetDriver->World->GetStreamingLevels();
+	for (ULevelStreaming* StreamingLevel : StreamingLevels)
+	{
+		const ULevel* Level = StreamingLevel->GetLoadedLevel();
+		if (Level == nullptr)
+		{
+			UE_LOG(LogGlobalStateManager, Warning, TEXT("Loaded level was nullptr on StreamingLevel %s"), *StreamingLevel->GetPathName());
+			continue;
+		}
+		for (AActor* Actor : Level->Actors)
+		{
+			HandleActorBasedOnLoadBalancer(Actor);
+		}
+	}
+	// IMP-END
 
 	NetDriver->World->GetWorldSettings()->SetGSMReadyForPlay();
 	NetDriver->World->GetWorldSettings()->NotifyBeginPlay();
