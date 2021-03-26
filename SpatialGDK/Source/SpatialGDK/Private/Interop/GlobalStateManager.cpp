@@ -126,7 +126,7 @@ void UGlobalStateManager::TrySendWorkerReadyToBeginPlay()
 		StaticComponentView->HasComponent(GlobalStateManagerEntityId, SpatialConstants::STARTUP_ACTOR_MANAGER_COMPONENT_ID);
 	const bool bWorkerEntityReady =
 		NetDriver->WorkerEntityId != SpatialConstants::INVALID_ENTITY_ID
-		&& StaticComponentView->HasAuthority(NetDriver->WorkerEntityId, SpatialConstants::GDK_KNOWN_ENTITY_AUTH_COMPONENT_SET_ID);
+		&& StaticComponentView->HasAuthority(NetDriver->WorkerEntityId, SpatialConstants::SERVER_WORKER_ENTITY_AUTH_COMPONENT_SET_ID);
 
 	if (bHasSentReadyForVirtualWorkerAssignment || !bHasReceivedStartupActorData || !bWorkerEntityReady)
 	{
